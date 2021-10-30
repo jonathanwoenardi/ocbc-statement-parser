@@ -1,4 +1,5 @@
 import csv
+from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 from glob import glob
@@ -10,52 +11,33 @@ from typing import Tuple, Optional
 import camelot
 
 
+@dataclass
 class Info:
     """
     Info represents all attributes of a monthly statement, except the transactions.
     """
 
-    def __init__(
-        self,
-        balance_brought_forward: Optional[Decimal] = None,
-        balance_carried_forward: Optional[Decimal] = None,
-        total_withdrawals: Optional[Decimal] = None,
-        total_deposits: Optional[Decimal] = None,
-        total_interest_paid_this_year: Optional[Decimal] = None,
-        average_balance: Optional[Decimal] = None,
-    ) -> None:
-        self.balance_brought_forward: Optional[Decimal] = balance_brought_forward
-        self.balance_carried_forward: Optional[Decimal] = balance_carried_forward
-        self.total_withdrawals: Optional[Decimal] = total_withdrawals
-        self.total_deposits: Optional[Decimal] = total_deposits
-        self.total_interest_paid_this_year: Optional[
-            Decimal
-        ] = total_interest_paid_this_year
-        self.average_balance: Optional[Decimal] = average_balance
+    balance_brought_forward: Optional[Decimal] = None
+    balance_carried_forward: Optional[Decimal] = None
+    total_withdrawals: Optional[Decimal] = None
+    total_deposits: Optional[Decimal] = None
+    total_interest_paid_this_year: Optional[Decimal] = None
+    average_balance: Optional[Decimal] = None
 
 
+@dataclass
 class Transaction:
     """
     Transaction represents a transaction entry in a monthly statement.
     """
 
-    def __init__(
-        self,
-        transaction_date: str,
-        value_date: str,
-        description: list[str],
-        cheque: str,  # TODO(jonathanwoenardi): Find out what is this.
-        withdrawal: Optional[Decimal],
-        deposit: Optional[Decimal],
-        balance: Optional[Decimal],
-    ) -> None:
-        self.transaction_date: str = transaction_date
-        self.value_date: str = value_date
-        self.descriptions: list[str] = description
-        self.cheque: str = cheque
-        self.withdrawal: Optional[Decimal] = withdrawal
-        self.deposit: Optional[Decimal] = deposit
-        self.balance: Optional[Decimal] = balance
+    transaction_date: str
+    value_date: str
+    descriptions: list[str]
+    cheque: str  # TODO(jonathanwoenardi): Find out what is this.
+    withdrawal: Optional[Decimal] = None
+    deposit: Optional[Decimal] = None
+    balance: Optional[Decimal] = None
 
     def append_description(self, description: str) -> None:
         self.descriptions.append(description)
@@ -101,14 +83,14 @@ SPECIAL_ROW_DESCRIPTIONS: list[SpecialRowDescription] = [
 ]
 
 
+@dataclass
 class Statement:
     """
     Statement represents a monthly statement.
     """
 
-    def __init__(self, info: Info, transactions: list[Transaction]) -> None:
-        self.info = info
-        self.transactions: list[Transaction] = transactions
+    info: Info
+    transactions: list[Transaction]
 
     def to_json_default(self, obj):
         # Reference: https://stackoverflow.com/questions/16957275/python-to-json-serialization-fails-on-decimal
