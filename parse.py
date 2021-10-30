@@ -45,8 +45,7 @@ class Transaction:
     def print_optional_decimal(self, value: Optional[Decimal]) -> str:
         if value is None:
             return ""
-        else:
-            return str(value)
+        return str(value)
 
     def csv_row(self):
         return [
@@ -125,8 +124,8 @@ class StatementParser:
         tables = camelot.read_pdf(self._pathname, flavor="stream", pages="1-end")
         all_transactions: list[Transaction] = []
         all_special_rows: list[list[str]] = []
-        for index in range(len(tables)):
-            transactions, special_rows = self.parse_table(tables[index], index)
+        for index, table in enumerate(tables):
+            transactions, special_rows = self.parse_table(table, index)
             all_transactions.extend(transactions)
             all_special_rows.extend(special_rows)
         info = self.parse_special_rows(all_special_rows)
@@ -147,14 +146,16 @@ class StatementParser:
             return [], []
         return self.parse_table_rows(data)
 
-    def parse_table_header(self, data: list[list[str]], index: int) -> list[list[str]]:
+    def parse_table_header(
+        self, data: list[list[str]], index: int
+    ) -> Optional[list[list[str]]]:
         """
         Check whether a table is a transaction table and find the begininning of the table.
         """
         for i in range(len(data)):
             if len(data[i]) == 0:
                 return None
-            leftmost_word = data[i][0]
+            leftmost_word: str = data[i][0]
             # From general sampling, the `Account No.` row seems to be the most consistent indicator of a transaction table.
             # Many (but not all) transaction tables include the `FRANK ACCOUNT` row just above the `Account No.` row.
             # Some transaction tables include many rows even before the `FRANK ACCOUNT` row.
@@ -162,12 +163,12 @@ class StatementParser:
             if leftmost_word.startswith("Account No."):
                 # Check the next 2 rows after this row.
                 if i + 2 >= len(data):
-                    logging.warning("Uncomplete headers")
+                    logging.warning("Incomplete headers")
                     self.failure_count += 1
                     self.save_failure_to_csv(data, index)
                     return None
-                next_leftmost_word = data[i + 1][0]
-                next2_leftmost_word = data[i + 2][0]
+                next_leftmost_word: str = data[i + 1][0]
+                next2_leftmost_word: str = data[i + 2][0]
                 if (
                     len(data[i]) == 7
                     and next_leftmost_word == "Transaction"
