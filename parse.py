@@ -139,7 +139,7 @@ class StatementParser:
         """
         Parse table.
         """
-        if len(table.data) == 0:
+        if table.shape[0] == 0 or table.shape[1] == 0:
             return [], []
         data = self.parse_table_header(table.data, index)
         if data is None:
@@ -153,8 +153,6 @@ class StatementParser:
         Check whether a table is a transaction table and find the begininning of the table.
         """
         for i in range(len(data)):
-            if len(data[i]) == 0:
-                return None
             leftmost_word: str = data[i][0]
             # From general sampling, the `Account No.` row seems to be the most consistent indicator of a transaction table.
             # Many (but not all) transaction tables include the `FRANK ACCOUNT` row just above the `Account No.` row.
