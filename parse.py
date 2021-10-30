@@ -160,60 +160,61 @@ class StatementParser:
             # Many (but not all) transaction tables include the `FRANK ACCOUNT` row just above the `Account No.` row.
             # Some transaction tables include many rows even before the `FRANK ACCOUNT` row.
             # The other non-transaction tables should not include `Account No.` row.
-            if leftmost_word.startswith("Account No."):
-                # Check the next 2 rows after this row.
-                if i + 2 >= len(data):
-                    logging.warning("Incomplete headers")
-                    self.failure_count += 1
-                    self.save_failure_to_csv(data, index)
-                    return None
-                next_leftmost_word: str = data[i + 1][0]
-                next2_leftmost_word: str = data[i + 2][0]
-                if (
-                    len(data[i]) == 7
-                    and next_leftmost_word == "Transaction"
-                    and next2_leftmost_word == "Date"
-                ):
-                    # Normal case
-                    self.success_count += 1
-                    return data[i + 3 :]
-                elif (
-                    len(data[i]) == 6
-                    and next_leftmost_word == "Transaction\nValue"
-                    and next2_leftmost_word == "Date\nDate"
-                ):
-                    # Exception case 1
-                    # On the last page, if there is only special rows and no more transactions entry,
-                    # camelot will fail to differentiate the first two columns as two different columns.
-                    # This is because the rows are empty and the headers are not separated with enough whitespace.
-                    # Exception case 2
-                    # Sometimes camelot also fails to differentiate first two columns for unclear reason. TODO(jonathanwoenardi): Investigate.
-                    # To mitigate both cases, we will detect the if first and second column are combined and split them.
-                    modified_data = []
-                    for row in data[i + 3 :]:
-                        new_row = []
-                        if row[0] == "":
-                            new_row = ["", ""]
-                        else:
-                            new_row = row[0].split("\n")
-                            if len(new_row) != 2:
-                                logging.warning(
-                                    f"Unexpected row in exception case: {row}"
-                                )
-                                self.failure_count += 1
-                                self.save_failure_to_csv(data, index)
-                                return None
-                        new_row.extend(row[1:])
-                        modified_data.append(new_row)
-                    return modified_data
-                else:
-                    # TODO(jonathanwoenardi): There may be more exception cases in the future...
-                    logging.warning(
-                        f"Unexpected headers after Account No.: {[next_leftmost_word, next2_leftmost_word]}"
-                    )
-                    self.failure_count += 1
-                    self.save_failure_to_csv(data, index)
-                    return None
+            if not leftmost_word.startswith("Account No."):
+                continue
+            # Check the next 2 rows after this row.
+            if i + 2 >= len(data):
+                logging.warning("Incomplete headers")
+                self.failure_count += 1
+                self.save_failure_to_csv(data, index)
+                return None
+            next_leftmost_word: str = data[i + 1][0]
+            next2_leftmost_word: str = data[i + 2][0]
+            if (
+                len(data[i]) == 7
+                and next_leftmost_word == "Transaction"
+                and next2_leftmost_word == "Date"
+            ):
+                # Normal case
+                self.success_count += 1
+                return data[i + 3 :]
+            elif (
+                len(data[i]) == 6
+                and next_leftmost_word == "Transaction\nValue"
+                and next2_leftmost_word == "Date\nDate"
+            ):
+                # Exception case 1
+                # On the last page, if there is only special rows and no more transactions entry,
+                # camelot will fail to differentiate the first two columns as two different columns.
+                # This is because the rows are empty and the headers are not separated with enough whitespace.
+                # Exception case 2
+                # Sometimes camelot also fails to differentiate first two columns for unclear reason. TODO(jonathanwoenardi): Investigate.
+                # To mitigate both cases, we will detect the if first and second column are combined and split them.
+                modified_data = []
+                for row in data[i + 3 :]:
+                    new_row = []
+                    if row[0] == "":
+                        new_row = ["", ""]
+                    else:
+                        new_row = row[0].split("\n")
+                        if len(new_row) != 2:
+                            logging.warning(
+                                f"Unexpected row in exception case: {row}"
+                            )
+                            self.failure_count += 1
+                            self.save_failure_to_csv(data, index)
+                            return None
+                    new_row.extend(row[1:])
+                    modified_data.append(new_row)
+                return modified_data
+            else:
+                # TODO(jonathanwoenardi): There may be more exception cases in the future...
+                logging.warning(
+                    f"Unexpected headers after Account No.: {[next_leftmost_word, next2_leftmost_word]}"
+                )
+                self.failure_count += 1
+                self.save_failure_to_csv(data, index)
+                return None
         self.ignore_count += 1
         return None
 
@@ -251,20 +252,20 @@ class StatementParser:
                     return transactions, special_rows
                 else:
                     continue
-            if row[0] != "":
-                if current_transaction is not None:
-                    transactions.append(current_transaction)
-                try:
-                    withdrawal = self.parse_amount(row[4])
-                    deposit = self.parse_amount(row[5])
-                    balance = self.parse_amount(row[6])
-                    current_transaction = Transaction(
-                        row[0], row[1], [row[2]], row[3], withdrawal, deposit, balance
-                    )
-                except Exception as e:
-                    logging.warning(f"Parse error: {e}")
-            else:
+            if row[0] == "":            
                 current_transaction.append_description(row[2])
+                continue
+            if current_transaction is not None:
+                transactions.append(current_transaction)
+            try:
+                withdrawal = self.parse_amount(row[4])
+                deposit = self.parse_amount(row[5])
+                balance = self.parse_amount(row[6])
+                current_transaction = Transaction(
+                    row[0], row[1], [row[2]], row[3], withdrawal, deposit, balance
+                )
+            except Exception as e:
+                logging.warning(f"Parse error: {e}")
         if current_transaction is not None:
             transactions.append(current_transaction)
         return transactions, special_rows
