@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import os
-from typing import List, Tuple, Optional
+from typing import Tuple, Optional
 import camelot
 
 
@@ -43,7 +43,7 @@ class Transaction:
         self,
         transaction_date: str,
         value_date: str,
-        description: List[str],
+        description: list[str],
         cheque: str,  # TODO(jonathanwoenardi): Find out what is this.
         withdrawal: Optional[Decimal],
         deposit: Optional[Decimal],
@@ -51,7 +51,7 @@ class Transaction:
     ) -> None:
         self.transaction_date: str = transaction_date
         self.value_date: str = value_date
-        self.descriptions: List[str] = description
+        self.descriptions: list[str] = description
         self.cheque: str = cheque
         self.withdrawal: Optional[Decimal] = withdrawal
         self.deposit: Optional[Decimal] = deposit
@@ -92,7 +92,7 @@ class SpecialRowDescription(str, Enum):
     AVERAGE_BALANCE = "Average Balance"
 
 
-SPECIAL_ROW_DESCRIPTIONS: List[SpecialRowDescription] = [
+SPECIAL_ROW_DESCRIPTIONS: list[SpecialRowDescription] = [
     SpecialRowDescription.BALANCE_BROUGHT_FORWARD,
     SpecialRowDescription.BALANCE_CARRIED_FORWARD,
     SpecialRowDescription.TOTAL_WITHDRAWALS_DEPOSITS,
@@ -106,9 +106,9 @@ class Statement:
     Statement represents a monthly statement.
     """
 
-    def __init__(self, info: Info, transactions: List[Transaction]) -> None:
+    def __init__(self, info: Info, transactions: list[Transaction]) -> None:
         self.info = info
-        self.transactions: List[Transaction] = transactions
+        self.transactions: list[Transaction] = transactions
 
     def to_json_default(self, obj):
         # Reference: https://stackoverflow.com/questions/16957275/python-to-json-serialization-fails-on-decimal
@@ -141,8 +141,8 @@ class StatementParser:
         # flavor="stream" -> OCBC uses whitespaces instead of lines to separate cells.
         # pages="1-end" -> parse all pages
         tables = camelot.read_pdf(self._pathname, flavor="stream", pages="1-end")
-        all_transactions: List[Transaction] = []
-        all_special_rows: List[List[str]] = []
+        all_transactions: list[Transaction] = []
+        all_special_rows: list[list[str]] = []
         for index in range(len(tables)):
             transactions, special_rows = self.parse_table(tables[index], index)
             all_transactions.extend(transactions)
@@ -154,7 +154,7 @@ class StatementParser:
         self,
         table: camelot.core.Table,
         index: int,
-    ) -> Tuple[List[Transaction], List[List[str]]]:
+    ) -> Tuple[list[Transaction], list[list[str]]]:
         """
         Parse table.
         """
@@ -165,7 +165,7 @@ class StatementParser:
             return [], []
         return self.parse_table_rows(data)
 
-    def parse_table_header(self, data: List[List[str]], index: int) -> List[List[str]]:
+    def parse_table_header(self, data: list[list[str]], index: int) -> list[list[str]]:
         """
         Check whether a table is a transaction table and find the begininning of the table.
         """
@@ -234,7 +234,7 @@ class StatementParser:
         self.ignore_count += 1
         return None
 
-    def save_failure_to_csv(self, data: List[List[str]], index: int):
+    def save_failure_to_csv(self, data: list[list[str]], index: int):
         csv_output_pathname = f"failures/{self._filename}-{index}.csv"
         with open(csv_output_pathname, "w") as f:
             writer = csv.writer(f, delimiter=",")
@@ -243,8 +243,8 @@ class StatementParser:
                 writer.writerow(modified_row)
 
     def parse_table_rows(
-        self, data: List[List[str]]
-    ) -> Tuple[List[Transaction], List[List[str]]]:
+        self, data: list[list[str]]
+    ) -> Tuple[list[Transaction], list[list[str]]]:
         """
         Parse all transactions and special rows from a header-stripped transaction table.
         """
@@ -255,8 +255,8 @@ class StatementParser:
         ):  # camelot guarantees that all rows in the table has the same number of columns.
             logging.warning(f"Unexpected statement table column number: {len(data[0])}")
             return [], []
-        transactions: List[Transaction] = []
-        special_rows: List[List[str]] = []
+        transactions: list[Transaction] = []
+        special_rows: list[list[str]] = []
         current_transaction = None
         for row in data:
             if (
@@ -286,7 +286,7 @@ class StatementParser:
             transactions.append(current_transaction)
         return transactions, special_rows
 
-    def parse_special_rows(self, rows: List[List[str]]) -> Info:
+    def parse_special_rows(self, rows: list[list[str]]) -> Info:
         """
         Parse statement information from rows with special descriptions.
         """
