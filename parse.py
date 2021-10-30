@@ -164,10 +164,9 @@ class StatementParser:
         Check whether a table is a transaction table and find the begininning of the table.
         """
         for i in range(len(data)):
-            row = data[i]
-            if len(row) == 0:
+            if len(data[i]) == 0:
                 return None
-            leftmost_word = row[0]
+            leftmost_word = data[i][0]
             # From general sampling, the `Account No.` row seems to be the most consistent indicator of a transaction table.
             # Many (but not all) transaction tables include the `FRANK ACCOUNT` row just above the `Account No.` row.
             # Some transaction tables include many rows even before the `FRANK ACCOUNT` row.
@@ -179,24 +178,35 @@ class StatementParser:
                 next_leftmost_word = data[i + 1][0]
                 next2_leftmost_word = data[i + 2][0]
                 if (
-                    next_leftmost_word == "Transaction"
+                    len(data[i]) == 7
+                    and next_leftmost_word == "Transaction"
                     and next2_leftmost_word == "Date"
                 ):
                     # Normal case
                     return data[i + 3 :]
                 elif (
-                    next_leftmost_word == "Transaction\nValue"
+                    len(data[i]) == 6
+                    and next_leftmost_word == "Transaction\nValue"
                     and next2_leftmost_word == "Date\nDate"
                 ):
                     # Exception case 1
                     # On the last page, if there is only special rows and no more transactions entry,
-                    # camelot will fail to differentiate the first two rows as two different columns.
+                    # camelot will fail to differentiate the first two columns as two different columns.
                     # This is because the rows are empty and the headers are not separated with enough whitespace.
-                    # To mitigate this, we will detect the combined headers and add add one additional column for the rows.
+                    # Exception case 2
+                    # Sometimes camelot also fails to differentiate first two columns for unclear reason. TODO(jonathanwoenardi): Investigate.
+                    # To mitigate both cases, we will detect the if first and second column are combined and split them.
                     modified_data = []
                     for row in data[i + 3 :]:
-                        new_row = [""]
-                        new_row.extend(row)
+                        new_row = []
+                        if row[0] == "":
+                            new_row = ["", ""]
+                        else:
+                            new_row = row[0].split("\n")
+                            if len(new_row) != 2:
+                                logging.warning(f"Unexpected row in exception case: {row}")
+                                return None
+                        new_row.extend(row[1:])
                         modified_data.append(new_row)
                     return modified_data
                 else:
