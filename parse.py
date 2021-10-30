@@ -130,6 +130,9 @@ class StatementParser:
         self._pathname: str = pathname
         self._filename: str = filename
         self.statement: Statement = None
+        self.success_count: int = 0
+        self.failure_count: int = 0
+        self.ignore_count: int = 0
 
     def parse(self):
         """
@@ -148,7 +151,9 @@ class StatementParser:
         self.statement = Statement(info, all_transactions)
 
     def parse_table(
-        self, table: camelot.core.Table, index: int,
+        self,
+        table: camelot.core.Table,
+        index: int,
     ) -> Tuple[List[Transaction], List[List[str]]]:
         """
         Parse table.
@@ -175,6 +180,9 @@ class StatementParser:
             if leftmost_word.startswith("Account No."):
                 # Check the next 2 rows after this row.
                 if i + 2 >= len(data):
+                    logging.warning("Uncomplete headers")
+                    self.failure_count += 1
+                    self.save_failure_to_csv(data, index)
                     return None
                 next_leftmost_word = data[i + 1][0]
                 next2_leftmost_word = data[i + 2][0]
@@ -184,6 +192,7 @@ class StatementParser:
                     and next2_leftmost_word == "Date"
                 ):
                     # Normal case
+                    self.success_count += 1
                     return data[i + 3 :]
                 elif (
                     len(data[i]) == 6
@@ -205,7 +214,11 @@ class StatementParser:
                         else:
                             new_row = row[0].split("\n")
                             if len(new_row) != 2:
-                                logging.warning(f"Unexpected row in exception case: {row}")
+                                logging.warning(
+                                    f"Unexpected row in exception case: {row}"
+                                )
+                                self.failure_count += 1
+                                self.save_failure_to_csv(data, index)
                                 return None
                         new_row.extend(row[1:])
                         modified_data.append(new_row)
@@ -215,14 +228,16 @@ class StatementParser:
                     logging.warning(
                         f"Unexpected headers after Account No.: {[next_leftmost_word, next2_leftmost_word]}"
                     )
+                    self.failure_count += 1
                     self.save_failure_to_csv(data, index)
                     return None
+        self.ignore_count += 1
         return None
 
-    def save_failure_to_csv(self, data :List[List[str]], index :int):
+    def save_failure_to_csv(self, data: List[List[str]], index: int):
         csv_output_pathname = f"failures/{self._filename}-{index}.csv"
         with open(csv_output_pathname, "w") as f:
-            writer = csv.writer(f, delimiter=",")           
+            writer = csv.writer(f, delimiter=",")
             for row in data:
                 modified_row = [elem.replace("\n", "\\n") for elem in row]
                 writer.writerow(modified_row)
@@ -307,11 +322,17 @@ class StatementParser:
 
 
 def main():
+    total_success_count = 0
+    total_failure_count = 0
+    total_ignore_count = 0
     statement_pdf_files = glob("statements/*.pdf")
     for pathname in sorted(statement_pdf_files):
         filename = pathname[len("statements/") : -len(".pdf")]
         s = StatementParser(pathname, filename)
         s.parse()
+        total_success_count += s.success_count
+        total_failure_count += s.failure_count
+        total_ignore_count += s.ignore_count
         # output JSON
         json_output_pathname = f"results/{filename}.json"
         with open(json_output_pathname, "w") as f:
@@ -323,7 +344,14 @@ def main():
             for transaction in s.statement.transactions:
                 writer.writerow(transaction.csv_row())
         # finish
-        print(f"parsed: {pathname}")
+        print(
+            "parsed: %24s | success: %2d | failure: %2d | ignore: %2d"
+            % (filename, s.success_count, s.failure_count, s.ignore_count)
+        )
+    print(
+        "finish | success: %2d | failure: %2d | ignore: %2d"
+        % (total_success_count, total_failure_count, total_ignore_count)
+    )
 
 
 if __name__ == "__main__":
