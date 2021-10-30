@@ -126,8 +126,9 @@ class StatementParser:
     StatementParser reads a PDF from a given file path and parse it into a Statement object.
     """
 
-    def __init__(self, pathname: str) -> None:
+    def __init__(self, pathname: str, filename: str) -> None:
         self._pathname: str = pathname
+        self._filename: str = filename
         self.statement: Statement = None
 
     def parse(self):
@@ -139,27 +140,27 @@ class StatementParser:
         tables = camelot.read_pdf(self._pathname, flavor="stream", pages="1-end")
         all_transactions: List[Transaction] = []
         all_special_rows: List[List[str]] = []
-        for table in tables:
-            transactions, special_rows = self.parse_table(table)
+        for index in range(len(tables)):
+            transactions, special_rows = self.parse_table(tables[index], index)
             all_transactions.extend(transactions)
             all_special_rows.extend(special_rows)
         info = self.parse_special_rows(all_special_rows)
         self.statement = Statement(info, all_transactions)
 
     def parse_table(
-        self, table: camelot.core.Table
+        self, table: camelot.core.Table, index: int,
     ) -> Tuple[List[Transaction], List[List[str]]]:
         """
         Parse table.
         """
         if len(table.data) == 0:
             return [], []
-        data = self.parse_table_header(table.data)
+        data = self.parse_table_header(table.data, index)
         if data is None:
             return [], []
         return self.parse_table_rows(data)
 
-    def parse_table_header(self, data: List[List[str]]) -> List[List[str]]:
+    def parse_table_header(self, data: List[List[str]], index: int) -> List[List[str]]:
         """
         Check whether a table is a transaction table and find the begininning of the table.
         """
@@ -214,8 +215,17 @@ class StatementParser:
                     logging.warning(
                         f"Unexpected headers after Account No.: {[next_leftmost_word, next2_leftmost_word]}"
                     )
+                    self.save_failure_to_csv(data, index)
                     return None
         return None
+
+    def save_failure_to_csv(self, data :List[List[str]], index :int):
+        csv_output_pathname = f"failures/{self._filename}-{index}.csv"
+        with open(csv_output_pathname, "w") as f:
+            writer = csv.writer(f, delimiter=",")           
+            for row in data:
+                modified_row = [elem.replace("\n", "\\n") for elem in row]
+                writer.writerow(modified_row)
 
     def parse_table_rows(
         self, data: List[List[str]]
@@ -300,7 +310,7 @@ def main():
     statement_pdf_files = glob("statements/*.pdf")
     for pathname in sorted(statement_pdf_files):
         filename = pathname[len("statements/") : -len(".pdf")]
-        s = StatementParser(pathname)
+        s = StatementParser(pathname, filename)
         s.parse()
         # output JSON
         json_output_pathname = f"results/{filename}.json"
