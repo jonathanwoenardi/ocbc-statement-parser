@@ -168,19 +168,20 @@ class StatementParser:
                 return None
             next_leftmost_word: str = data[i + 1][0]
             next2_leftmost_word: str = data[i + 2][0]
-            if (
+            is_normal_case = (
                 len(data[i]) == 7
                 and next_leftmost_word == "Transaction"
                 and next2_leftmost_word == "Date"
-            ):
-                # Normal case
+            )
+            if is_normal_case:
                 self.success_count += 1
                 return data[i + 3 :]
-            elif (
+            is_known_exception_case = (
                 len(data[i]) == 6
                 and next_leftmost_word == "Transaction\nValue"
                 and next2_leftmost_word == "Date\nDate"
-            ):
+            )
+            if is_known_exception_case:
                 # Exception case 1
                 # On the last page, if there is only special rows and no more transactions entry,
                 # camelot will fail to differentiate the first two columns as two different columns.
@@ -196,9 +197,7 @@ class StatementParser:
                     else:
                         new_row = row[0].split("\n")
                         if len(new_row) != 2:
-                            logging.warning(
-                                f"Unexpected row in exception case: {row}"
-                            )
+                            logging.warning(f"Unexpected row in exception case: {row}")
                             self.failure_count += 1
                             self.save_failure_to_csv(data, index)
                             return None
@@ -250,7 +249,7 @@ class StatementParser:
                     return transactions, special_rows
                 else:
                     continue
-            if row[0] == "":            
+            if row[0] == "":
                 current_transaction.append_description(row[2])
                 continue
             if current_transaction is not None:
